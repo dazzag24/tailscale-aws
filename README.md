@@ -12,7 +12,20 @@ Resource List:
 * A NAT/Bastion EC2 instance provisioned in the public subnet
 * A second EC2 instance provisioned in the private subnet
 
-Both of the EC2 instances have the Tailscale Relay software installed and configured but need to be initialized using commands run on the console of each node and then an additional configuration step in the [Tailscale management console](https://login2.tailscale.io/admin).
+Both of the EC2 instances have the Tailscale software installed and configured but need to be initialized using commands run on the console of each node and then an additional configuration step in the [Tailscale management console](https://login2.tailscale.io/admin).
+
+Use [t3a.nano](https://aws.amazon.com/ec2/instance-types/t3/) EC2 instances which are AMD based.
+
+Have tried to use a [t4g.nano](https://aws.amazon.com/ec2/instance-types/t4/) which are ARM (Graviton) based [Amazon Linux 2](https://aws.amazon.com/amazon-linux-2/) instances but these fail with an odd error:
+
+`Status Reason: The requested configuration is currently not supported. Please check the documentation for supported configurations. Launching EC2 instance failed.`
+
+See this for more detials: https://stackoverflow.com/questions/45691826/aws-launch-configuration-error-the-requested-configuration-is-currently-not-sup
+
+Furthermore the installation of tailscale currently fails on Amazon Linux 2, so I have changed the template to use Ubuntu 20.04.
+
+Use contents of /var/log/cloud-init-output.log on the deployed EC2 instance to see if the deployment had any errors.
+
 
 ## Step 1: Deploy the CloudFormation Template
 

@@ -51,6 +51,7 @@ Parameters:
   InstanceType:
     Description: 'EC2 instance type. Enter any valid type - https://aws.amazon.com/ec2/instance-types/'
     Type: String
+    # Default: 't4g.nano'
     Default: 't3a.nano'
 
   PrivateSubnet1CIDR:
@@ -109,10 +110,18 @@ Resources:
         Fn::Base64: |
           #!/bin/bash
 
-          # Install, configure and start tailscale client
-          rpm -i $(curl -s https://tailscale.com/kb/1029/install-files | grep -oP 'https://(.*)tailscale-relay-(.*).x86_64.rpm')
-          sed -i 's/ACL_FILE/#ACL_FILE/'  /etc/default/tailscale-relay
-          systemctl enable tailscale-relay
+          # Install yum-config-manager if missing
+          yum install yum-utils
+          # Fix bug see https://tailscale.com/download/linux/amazon-linux-2
+          sudo yum update gnupg2
+          # Add the tailscale repository
+          yum-config-manager --add-repo https://pkgs.tailscale.com/stable/amazon-linux/2/tailscale.repo
+          # Install Tailscale
+          yum install tailscale
+          # Enable and start tailscaled
+          systemctl enable --now tailscaled
+          # Start Tailscale!
+          tailscale up
 
   PrivateSubnetSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
@@ -148,12 +157,20 @@ Resources:
           sysctl -w net.ipv4.ip_forward=1
           /sbin/iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
 
-          # Install tailscale client
-          rpm -i $(curl -s https://tailscale.com/kb/1029/install-files | grep -oP 'https://(.*)tailscale-relay-(.*).x86_64.rpm')
-          # Configure and get it ready for tailscale-login
-          sed -i 's/FLAGS=""/FLAGS="--routes=10.0.0.0\/24,10.0.1.0\/24"/' /etc/default/tailscale-relay
-          sed -i 's/ACL_FILE/#ACL_FILE/'  /etc/default/tailscale-relay
-          systemctl enable tailscale-relay
+          # Install yum-config-manager if missing
+          yum install yum-utils
+          # Fix bug see https://tailscale.com/download/linux/amazon-linux-2
+          sudo yum update gnupg2
+          # Add the tailscale repository
+          yum-config-manager --add-repo https://pkgs.tailscale.com/stable/amazon-linux/2/tailscale.repo
+          # Install Tailscale
+          yum install tailscale
+          # Enable and start tailscaled
+          systemctl enable --now tailscaled
+          # Configure the routes
+          sed -i 's/FLAGS=""/FLAGS="--routes=10.0.0.0\/24,10.0.1.0\/24"/' /etc/default/tailscaled
+          # Start Tailscale!
+          tailscale up
 
   EIP:
     Type: 'AWS::EC2::EIP'

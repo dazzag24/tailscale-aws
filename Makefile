@@ -3,9 +3,9 @@
 #
 
 SSH_ALLOWED_IPS := '0.0.0.0/0'
-SSH_KEY := 'ts'
+SSH_KEY := 'tailscale'
 STACK_NAME := 'tailscale-demo'
-TEMPLATE := 'templates/tailscale-demo.yaml'
+TEMPLATE := 'templates/tailscale-ubuntu.yaml'
 
 about:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(firstword $(MAKEFILE_LIST)) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
