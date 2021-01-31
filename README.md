@@ -41,7 +41,7 @@ Use contents of /var/log/cloud-init-output.log on the deployed EC2 instance to s
 If you're using Mac or Linux _and_ have your AWS CLI configured for your account you can deploy using the project Makefile
 
 * At the top of the Makefile change the name of the SSH key to the one you'll use in your account. You can optionally update the SSH_ALLOWED_IPS variable.
-  * `SSH_KEY := 'ts'` <~~ Your key name here
+  * `SSH_KEY := 'tailscale'` <~~ Your key name here
 * Deploy or delete using make
   * `make deploy`
   * `make delete`
@@ -54,7 +54,7 @@ The configuration steps require you to log into the console of each node and aut
 
 ### Step 2.2 - Configure the NAT Server
 
-Locate the public IP of the NAT server either in the EC2 console or by looking at the Outputs tab of the CloudFormation stack and update the HostName line in the ts-nat-public block of your config file. SSH into the NAT instance (Using config file example: `ssh ts-nat-public`) and run the following commands. 
+Locate the public IP of the NAT server either in the EC2 console or by looking at the Outputs tab of the CloudFormation stack and update the HostName line in the ts-nat-public block of your config file. SSH into the NAT instance (Using config file example: `ssh -F sshconfig ts-nat-public`) and run the following commands. 
 
 From the NAT server console run the `sudo tailscale-login` command
   * In any browser, open the URL printed to the console
@@ -75,7 +75,7 @@ Once you've authorized the service to enable subnet routes restart the tailscale
 
 Locate the private IP of the second server either in the EC2 console or by looking at the Outputs tab of the CloudFormation stack adn update the Hostname line in the ts-node-private block of your config file. This block has an additional ProxyJump command which allows us to get to the console of an instance with no public IP by jumping through the NAT/Bastion instance.
 
-SSH into the NAT instance (Using config file example: `ssh ts-node-private`) and run the following commands. 
+SSH into the NAT instance (Using config file example: `ssh -F sshconfig ts-node-private`) and run the following commands. 
 
 Commands to run from the second instance console
 * `sudo tailscale-login`
