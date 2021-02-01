@@ -2,4 +2,5 @@ venv/
 .vscode/
 .code-workspace
 .env
-sshconfig
+ssh.config
+*.log
