@@ -2,10 +2,11 @@
 # Run `make` in the current directory to see targets of interest
 #
 
-SSH_ALLOWED_IPS := '0.0.0.0/0'
-SSH_KEY := 'tailscale'
-STACK_NAME := 'tailscale-demo'
-TEMPLATE := 'templates/tailscale-ubuntu.yaml'
+# Read env vars from .env file if it is present
+ifneq (,$(wildcard ./.env))
+    include .env
+    export
+endif
 
 about:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(firstword $(MAKEFILE_LIST)) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
@@ -26,7 +27,9 @@ deploy: ## Deploy the demo stack
 		--template-file $(TEMPLATE) \
 		--parameter-overrides \
 			SshAllowedIPs=$(SSH_ALLOWED_IPS) \
-			SshKey=$(SSH_KEY)
+			SshKey=$(SSH_KEY) \
+			InstanceType=$(EC2_INSTANCE_TYPE) \
+			TailscalePreAuthKey=$(TAILSCALE_PREAUTH_KEY)
 .PHONY: deploy
 
 lint: cfn-lint-exists ## Lint templates

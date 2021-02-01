@@ -12,15 +12,16 @@ Metadata:
           default: 'Required'
         Parameters:
           - SshKey
+          - TailscalePreAuthKey
       - Label:
           default: 'Probably want to update'
         Parameters:
           - SshAllowedIPs
+          - InstanceType
       - Label:
           default: 'Probably no need to update but available to customize'
         Parameters:
           - AmiId
-          - InstanceType
           - PrivateSubnet1CIDR
           - PublicSubnet1CIDR
           - VpcCIDR
@@ -37,6 +38,8 @@ Metadata:
         default: 'Default is to allow any address to connect to port 22. Use the URL below to get your IPv4 address and add a /32 to restrict to just your IP. Example: 12.34.56.78/32'
       SshKey:
         default: 'SSH Key Pair. Select an existing key from the list or go to EC2 -> Key Pairs and press the Create key pair button to create a new key.'
+      TailscalePreAuthKey:
+        default: 'Tailscale Pre-authentication key. Go to https://login.tailscale.com/admin/authkeys and create a reusable key'
       VpcCIDR:
         default: 'VPC CIDR'
 
@@ -51,7 +54,6 @@ Parameters:
   InstanceType:
     Description: 'EC2 instance type. Enter any valid type - https://aws.amazon.com/ec2/instance-types/'
     Type: String
-    # Default: 't4g.nano'
     Default: 't3a.nano'
 
   PrivateSubnet1CIDR:
@@ -77,6 +79,10 @@ Parameters:
     Description: 'SSH key to access instances'
     Type: 'AWS::EC2::KeyPair::KeyName'
 
+  TailscalePreAuthKey:
+    Description: 'Tailscale Pre-authentication key'
+    Type: String
+
   VpcCIDR:
     Description: Please enter the IP range (CIDR notation) for this VPC
     Type: String
@@ -87,7 +93,7 @@ Mappings:
 
   Constants:
     ValueOf:
-      EnvironmentName: 'Tailscale Demo'
+      EnvironmentName: 'Tailscale VPN'
 
 Resources:
 
@@ -106,20 +112,38 @@ Resources:
       Tags:
         - Key: Name
           Value: 'Private Subnet Server'
+      # UserData:
+      #   Fn::Base64: |
+      #     #!/bin/bash
+
+      #     curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.gpg | apt-key add -
+      #     curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.list | tee /etc/apt/sources.list.d/tailscale.list
+
+      #     apt-get update
+      #     apt-get install -y tailscale
+
+      #     systemctl enable --now tailscaled
+
+      #     # Start Tailscale!
+      #     sudo tailscale up
       UserData:
-        Fn::Base64: |
-          #!/bin/bash
-
-          curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.gpg | apt-key add -
-          curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.list | tee /etc/apt/sources.list.d/tailscale.list
-
-          apt-get update
-          apt-get install -y tailscale
-
-          systemctl enable --now tailscaled
-
-          # Start Tailscale!
-          sudo tailscale up
+        Fn::Base64:
+          Fn::Join:
+            - ""
+            -
+              - "#!/bin/bash -ex"
+              - "\n"
+              - "curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.gpg | apt-key add -"
+              - "\n"
+              - "curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.list | tee /etc/apt/sources.list.d/tailscale.list"
+              - "\n"
+              - "apt-get update && apt-get install -y tailscale"
+              - "\n"
+              - "systemctl enable --now tailscaled"
+              - "\n"
+              - "sudo tailscale up --authkey "
+              - Ref: "TailscalePreAuthKey"
+              - "\n"
 
   PrivateSubnetSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
@@ -148,22 +172,31 @@ Resources:
         - Key: Name
           Value: 'NAT Server'
       UserData:
-        Fn::Base64: |
-          #!/bin/bash
-
-          # Allow IP forwarding
-          echo 'net.ipv4.ip_forward = 1' | sudo tee -a /etc/sysctl.conf
-          sysctl -p /etc/sysctl.conf
-
-          curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.gpg | apt-key add -
-          curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.list | tee /etc/apt/sources.list.d/tailscale.list
-
-          apt-get update
-          apt-get install -y tailscale
-
-          systemctl enable --now tailscaled
-
-          tailscale up --advertise-routes=10.0.0.0/24,10.0.1.0/24
+        Fn::Base64:
+          Fn::Join:
+            - ""
+            -
+              - "#!/bin/bash -ex"
+              - "\n"
+              - "apt-get update && apt-get install -y --reinstall iptables"
+              - "\n"
+              - "echo 'net.ipv4.ip_forward = 1' | sudo tee -a /etc/sysctl.conf"
+              - "\n"
+              - "sysctl -p /etc/sysctl.conf"
+              - "\n"
+              - "sudo /usr/sbin/iptables -t nat -A POSTROUTING -o ens5 -j MASQUERADE"
+              - "\n"
+              - "curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.gpg | apt-key add -"
+              - "\n"
+              - "curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/focal.list | tee /etc/apt/sources.list.d/tailscale.list"
+              - "\n"
+              - "apt-get update && apt-get install -y tailscale"
+              - "\n"
+              - "systemctl enable --now tailscaled"
+              - "\n"
+              - "sudo tailscale up --advertise-routes=10.0.0.0/24,10.0.1.0/24 --authkey "
+              - Ref: "TailscalePreAuthKey"
+              - "\n"
 
   EIP:
     Type: 'AWS::EC2::EIP'
@@ -189,6 +222,10 @@ Resources:
         - IpProtocol: tcp
           FromPort: 443
           ToPort: 443
+          CidrIp: !Ref PrivateSubnet1CIDR
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
           CidrIp: !Ref PrivateSubnet1CIDR
         - IpProtocol: udp
           FromPort: 0

@@ -1,0 +1,25 @@
+
+# The public IP of the NAT server
+Host ts-nat-public
+	HostName x.x.x.x
+
+# The Tailscale IP of the NAT server once configured
+Host ts-nat
+	HostName 100.x.x.x
+
+# The private IP of the node in the private subnet
+Host ts-node-private
+    HostName 10.0.1.x
+    ProxyJump ts-nat-public
+
+# The Tailscale IP of the node in the private subnet
+Host ts-node
+    HostName 100.x.x.x
+
+# Settings that apply to all hosts. Update IdentityFile if needed.
+# If using Ubuntu - use 'ubuntu' as user
+# If using Amazon Linux 2 - use 'ec2-user' as user
+Host *
+	#User ec2-user
+    User ubuntu
+    IdentityFile ~/.ssh/<SSH_KEY_NAME_HERE>.pem
