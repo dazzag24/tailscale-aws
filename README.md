@@ -16,32 +16,32 @@ Both of the EC2 instances have the Tailscale software installed and configured b
 
 Use [t3a.nano](https://aws.amazon.com/ec2/instance-types/t3/) EC2 instances which are AMD based.
 
-Have tried to use a [t4g.nano](https://aws.amazon.com/ec2/instance-types/t4/) which are ARM (Graviton) based [Amazon Linux 2](https://aws.amazon.com/amazon-linux-2/) instances but these fail with an odd error:
+I also tried to use a [t4g.nano](https://aws.amazon.com/ec2/instance-types/t4/) which are ARM (Graviton) based [Amazon Linux 2](https://aws.amazon.com/amazon-linux-2/) instances but these fail when deploying the NAT server with an unhelpfully generic error:
 
 `Status Reason: The requested configuration is currently not supported. Please check the documentation for supported configurations. Launching EC2 instance failed.`
 
-See this for more detials: https://stackoverflow.com/questions/45691826/aws-launch-configuration-error-the-requested-configuration-is-currently-not-sup
+See this for more details: https://stackoverflow.com/questions/45691826/aws-launch-configuration-error-the-requested-configuration-is-currently-not-sup
 
 Furthermore the installation of tailscale currently fails on Amazon Linux 2, so I have changed the template to use Ubuntu 20.04.
 
-Use contents of /var/log/cloud-init-output.log on the deployed EC2 instance to see if the deployment had any errors.
+If the deployment does not work then look at the cloudformation deloyment logs to help find the cause:
+
+`aws cloudformation describe-stack-events --stack-name tailscale-vpn`
+
+If these are OK, then perhaps some aspect of the cloud-init script failed.  Log into the instances and use the contents of /var/log/cloud-init-output.log on the deployed EC2 instance to see what happened.
 
 
 ## Step 1: Deploy the CloudFormation Template
 
-### Manual Template Deployment
+If you're using Mac or Linux _and_ have your AWS CLI configured for your account you can deploy using the project Makefile.  
 
-* Ensure you have an [EC2 Key Pair](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html#having-ec2-create-your-key-pair) created in the region in which you'll deploy the stack and then press the button <a href="https://console.aws.amazon.com/cloudformation/home#/stacks/quickcreate?templateUrl=https%3A%2F%2Fs3.amazonaws.com%2Fstatic-01.andyspohn.com%2Ftailscale-aws%2Fv0.0.1%2Ftailscale-demo.yaml&stackName=tailscale-demo&param_AmiId=%2Faws%2Fservice%2Fami-amazon-linux-latest%2Famzn2-ami-hvm-x86_64-gp2&param_InstanceType=t3a.nano&param_PrivateSubnet1CIDR=10.0.1.0%2F24&param_PublicSubnet1CIDR=10.0.0.0%2F24&param_SshAllowedIPs=0.0.0.0%2F0&param_VpcCIDR=10.0.0.0%2F16"><img src="https://s3.amazonaws.com/cloudformation-examples/cloudformation-launch-stack.png"/></a>
-* Select your SSH keypair from the drop-down list
-* Enter a CIDR mask for just your IP using a web [IPv4 lookup service](https://checkip.amazonaws.com)
-  * Make sure you add the /32 suffix to restrict to just your IP
+* First
 
-### Automated Template Deployment
+* Copy the sample .env file (`.env-example`) to become your local `.env` file (DO NOT CHECK THIS INTO GITHUB).  Most likely you will need to edit the SSH key name to match yours, but you WILL HAVE TO configure it with your own Tailscale pre-authentication key.  Go to https://login.tailscale.com/admin/authkeys and create a reusable key You can optionally update the SSH_ALLOWED_IPS variable.
+  * `SSH_KEY='<YOUR_SSH_KEY_HERE>'` <~~ Your key name here
+  * `TAILSCALE_PREAUTH_KEY='<PLACE_YOUR_TAILSCALE_PREAUTH_KEY_HERE>'`
 
-If you're using Mac or Linux _and_ have your AWS CLI configured for your account you can deploy using the project Makefile
 
-* At the top of the Makefile change the name of the SSH key to the one you'll use in your account. You can optionally update the SSH_ALLOWED_IPS variable.
-  * `SSH_KEY := 'tailscale'` <~~ Your key name here
 * Deploy or delete using make
   * `make deploy`
   * `make delete`
@@ -50,37 +50,17 @@ If you're using Mac or Linux _and_ have your AWS CLI configured for your account
 
 ### Step 2.1 - SSH Config File
 
-The configuration steps require you to log into the console of each node and authenticate to the Tailscale service. This will create a config file which is needed before you can start the service. Read the SSH Config File Suggestion section below for a suggestion on how to configure your SSH using a config file. You can accomplish the ssh steps in a number of different ways but the remainder of this section assumes you've set up your config file as suggested. If you can't connect try running ssh with the `-v` flag to identify the connection problem.
+Read the SSH Config File Suggestion section below for a suggestion on how to configure your SSH using a config file. You can accomplish the ssh steps in a number of different ways but the remainder of this section assumes you've set up your config file as suggested. If you can't connect try running ssh with the `-v` flag to identify the connection problem.
 
-### Step 2.2 - Configure the NAT Server
+Using config file example: `ssh -F ssh.config ts-nat-public`
 
-Locate the public IP of the NAT server either in the EC2 console or by looking at the Outputs tab of the CloudFormation stack and update the HostName line in the ts-nat-public block of your config file. SSH into the NAT instance (Using config file example: `ssh -F sshconfig ts-nat-public`) and run the following commands. 
+### Step 2.2 - Configure the NAT 
 
-From the NAT server console run the `sudo tailscale-login` command
-  * In any browser, open the URL printed to the console
-  * Upon successful authentication you will see the Tailscale client exit. Note that it has written a configuration file to `/var/lib/tailscale/relay` conf.
+If the cloudformation deployment is successfuly you will see the EC2 nodes appear and you should also see 2 new nodes appear in your Tailscale admin page https://login.tailscale.com/admin/machines.
 
-Start the service using the command `sudo systemctl start tailscale-relay`
-  * Check service status with `sudo systemctl status tailscale-relay`
+* From the Tailscale web console click the Enable Subnet Routes option for the NAT server
 
-From the Tailscale web console click the Enable Subnet Routes option for the NAT server
-* After succesfully authenticating and starting the service on the NAT server you'll see an entry for the node in the [Tailscale Admin Console](https://login2.tailscale.io/admin) in the Machines section.
 * The routes to both the public and private subnets have been configured as described in the [documentation](https://tailscale.com/kb/1019/install-subnets) but an additional step of Enabling Subnet Routes from the admin console must be completed before connectivity to nodes in the private subnet can be established.
-* After enabling subnet routes the NAT server node should now have both a green checkmark and a blue network icon.
-
-Once you've authorized the service to enable subnet routes restart the tailscale-relay service in the console of the NAT server
-* Start the service using the command `sudo systemctl start tailscale-relay`
-
-### Step 2.3 - Configure the second node in the private subnet
-
-Locate the private IP of the second server either in the EC2 console or by looking at the Outputs tab of the CloudFormation stack adn update the Hostname line in the ts-node-private block of your config file. This block has an additional ProxyJump command which allows us to get to the console of an instance with no public IP by jumping through the NAT/Bastion instance.
-
-SSH into the NAT instance (Using config file example: `ssh -F sshconfig ts-node-private`) and run the following commands. 
-
-Commands to run from the second instance console
-* `sudo tailscale-login`
-* Start the service using the command `sudo systemctl start tailscale-relay`
-  * Check service status with `sudo systemctl status tailscale-relay`
 
 ## Step 3: Tests
 
@@ -89,7 +69,7 @@ Commands to run from the second instance console
   * If this command doesn't succeed and return a redirect then the node has not been configured correctly
 * To test connectivity between nodes you should be able to ping the 100.x.x.x address between any two nodes
 * If you've installed the client on your Mac or Windows workstation you should be able to ping or SSH into either of these EC2 instances using their 100.x.x.x IPs despite the fact that one of them is in a private subnet and doesn't even have a public IP
-* In your ~/.ssh/config file update the HostName values for the `ts-nat` and `ts-node` blocks with the 100.x.x.x IPs found in the admin console and attempt to ssh into the servers again using their Tailscale IPs
+* In your ssh.config file update the HostName values for the `ts-nat` and `ts-node` blocks with the 100.x.x.x IPs found in the admin console and attempt to ssh into the servers again using their Tailscale IPs
 
 ## Step 4: Delete the CloudFormation Stack
 
@@ -99,7 +79,7 @@ To tear down the stack and release all the provisioned resources [use the Delete
 
 ### SSH Config File Suggestion
 
-Use an `~/.ssh/config` file to map the various name and ip combinations. An example below showing the two nodes below described in Step 2 of the setup instructions.
+Once you have successfully tested you may want to merge the content of the ssh.config permanently witj your `~/.ssh/config` file to map the various name and ip combinations. An example below showing the two nodes below described in Step 2 of the setup instructions.
 
 Update the x.x.x.x placeholders with the IPs of your servers and change the IdentityFile name if you didn't save your key pair as ts.pem
 
