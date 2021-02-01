@@ -2,7 +2,7 @@
 
 ![license](https://img.shields.io/badge/license-MIT-green)
 
-This repo contains a CloudFormation template that automates the deployment process described in the [Setting up Tailscale on AWS EC2](https://tailscale.com/kb/1021/install-aws) project knowledgebase article.
+This repo contains a CloudFormation template that automates the deployment process described in the [Setting up Tailscale on AWS EC2](https://tailscale.com/kb/1021/install-aws) project knowledgebase article.  See also this article on [subnet routes](https://tailscale.com/kb/1019/subnets).
 
 _With the default configuration this solution will deploy resources that cost about $0.01/hr_
 
