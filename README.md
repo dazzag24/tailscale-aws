@@ -30,6 +30,12 @@ If the deployment does not work then look at the cloudformation deloyment logs t
 
 If these are OK, then perhaps some aspect of the cloud-init script failed.  Log into the instances and use the contents of /var/log/cloud-init-output.log on the deployed EC2 instance to see what happened.
 
+TODO
+
+- Make iptables changes persistent in Ubunutu template.  See https://linuxconfig.org/how-to-make-iptables-rules-persistent-after-reboot-on-linux
+- Use a pair of single use tailscale pre-authkeys.
+- Change the security group rules to use the security group names rather than hard coding 10.0.0.0/24 
+
 
 ## Step 1: Deploy the CloudFormation Template
 
